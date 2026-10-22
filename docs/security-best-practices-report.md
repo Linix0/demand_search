@@ -2,9 +2,9 @@
 
 ## Executive summary
 
-The current delivery is a loopback-only, single-user research workbench with a Mock evidence loop. Its strongest controls are the SSRF-gated manual fetcher, deterministic quote verification, program-owned evidence metadata, React output escaping, external-link validation, and CSV formula neutralization. The principal remaining risks are the absence of authentication and workspace authorization, the lack of a robots/terms preflight for real source collection, and the need for an online audit refresh after dependency cleanup. The system is not safe to expose to a LAN or the public internet in its current form.
+The current delivery is a loopback-only, single-user research workbench with a Mock evidence loop. Its strongest controls are the SSRF-gated manual fetcher, deterministic quote verification, program-owned evidence metadata, React output escaping, external-link validation, and CSV formula neutralization. The principal remaining risks are the absence of authentication and workspace authorization and the lack of a robots/terms preflight for real source collection. The current lockfile has no registry-reported npm advisories, but the audit must remain a CI gate. The system is not safe to expose to a LAN or the public internet in its current form.
 
-Review date: 2026-10-22. Reviewed application scope: FastAPI API, Celery worker, React SPA, Nginx configuration, Docker Compose, source import/fetch path, scoring/evidence boundary, and exports. Docker containers were not started because the Docker daemon was unavailable; the Compose file was parsed only.
+Review date: 2026-10-22. Reviewed application scope: FastAPI API, Celery worker, React SPA, Nginx configuration, Docker Compose, source import/fetch path, scoring/evidence boundary, and exports. The Compose stack was subsequently started and verified on the same date; see `docs/runtime-verification.md`.
 
 ## Findings
 
@@ -24,21 +24,21 @@ Review date: 2026-10-22. Reviewed application scope: FastAPI API, Celery worker,
 
 **False-positive notes:** The absence is intentional for the local MVP according to `docs/architecture.md` and `AGENTS.md`. It becomes a real vulnerability only when the API is reachable by another trust domain.
 
-### SEC-002: Dependency audit requires an online refresh before release
+### SEC-002: Online dependency audit completed and advisories remediated
 
-**Severity:** Medium pending registry confirmation; the prior local result was reduced by dependency cleanup.
+**Severity:** Closed for the current lockfile; reopen on any new advisory or dependency change.
 
 **Location:** `frontend/package.json:1`, `frontend/package-lock.json:1`
 
-**Evidence:** The initial `npm install` reported 2 critical and 1 moderate vulnerability. The frontend contained three unused dependencies (`@tanstack/react-table`, `recharts`, and `date-fns`). They were removed, which deleted 40 transitive packages. The resulting `npm uninstall --offline` run reported zero vulnerabilities, and `npm audit --offline --json` reported zero across 536 dependencies. A registry-backed `npm audit` could not complete because the sandbox had no registry access and the escalation reviewer returned a service error, so the online advisory refresh remains unverified.
+**Evidence:** Registry-backed `npm audit --json` found one moderate and two critical advisories in the `vitest` 3.2.7 chain (`@vitest/mocker` and `tinypool`). `vitest` was upgraded to 4.1.12, which supports Node 20 and the existing Vite 6 peer range, and `@testing-library/dom` 10.4.2 was declared explicitly because it is a required peer of `@testing-library/react`. The resulting audit reported 0 vulnerabilities across 528 dependencies. The rebuilt Docker web image ran `npm ci` and also reported 0 vulnerabilities.
 
-**Impact:** A vulnerable build or development dependency could compromise maintainer machines, generated assets, or the production bundle. Removing unused packages reduced the attack surface, but a stale offline advisory cache can miss newer advisories.
+**Impact:** The affected Vitest chain is development-only, but its file-read, mock-registration, and prototype-pollution advisories could compromise a maintainer machine or test process. The production bundle does not load Vitest.
 
-**Fix:** Run registry-backed `npm audit --json` in CI or an online maintainer environment, verify the zero result against current advisories, and rerun lint, typecheck, tests, build, and audit after any lockfile change.
+**Fix:** Executed online, then reran frontend lint, typecheck, Vitest 4.1.12 (5 tests), production build, and the Docker web build. Keep `npm audit --json` as a CI gate because the zero result is point-in-time.
 
 **Mitigation:** The production frontend is a static build, runtime code does not execute untrusted npm packages, and unused dependencies have been removed.
 
-**False-positive notes:** The prior count came from an actual install run without advisory identities. Do not claim registry-verified safety from an offline audit.
+**False-positive notes:** Zero current advisories does not prove future safety. New advisories can affect an unchanged lockfile and require a fresh audit.
 
 ### SEC-003: Manual import has transport safety but no robots or terms preflight
 
@@ -104,21 +104,21 @@ Review date: 2026-10-22. Reviewed application scope: FastAPI API, Celery worker,
 
 **False-positive notes:** Tailwind emits a stylesheet, so inline styles may not be necessary. Confirm against the built Nginx deployment before changing the policy.
 
-### SEC-007: Docker stack is configuration-valid but not runtime-verified
+### SEC-007: Docker stack runtime verified on 2026-10-22
 
-**Severity:** Low as a security finding; High as a release-readiness gap.
+**Severity:** Closed for the Phase 1 loopback-only stack; production hardening remains separate.
 
 **Location:** `docker-compose.yml:1`, `backend/Dockerfile:1`, `frontend/Dockerfile:1`
 
-**Evidence:** `docker compose config --quiet` can parse the file, but `docker version` could not reach a Docker engine, so the images, migrations, worker connectivity, Nginx proxy, and runtime headers were not exercised.
+**Evidence:** `docker compose up --build -d` completed, and `docker compose ps` reported PostgreSQL, Redis, API, and web `healthy` with the worker `running`. API logs showed the initial Alembic migration to `ae1ad88ecfe8`. The worker connected to Redis and received `research_jobs.execute`. The API and worker ran as `uid=100(app)`, and Nginx served `/`, `/health`, and `/openapi.json` over loopback with the configured security headers.
 
-**Impact:** Security controls asserted in code may fail at runtime because of image permissions, migration behavior, proxy settings, or container networking.
+**Impact:** No runtime verification failure was observed. The offline demo completed with 30 persisted sources, 30 pain points, 30 evidence records, and 90 separate score records; all three export formats and the SSRF rejection path worked through Nginx.
 
-**Fix:** Run `docker compose up --build`, verify `/health`, `/`, API proxy behavior, security headers, non-root backend execution, and offline demo through the Nginx origin. Record the result before calling the deployment verified.
+**Fix:** Executed. Health, migrations, worker connectivity, Nginx proxy behavior, headers, non-root backend execution, exports, browser flow, and SSRF rejection are recorded in `docs/runtime-verification.md`.
 
-**Mitigation:** Local Python and frontend commands were exercised directly, including the browser flow.
+**Mitigation:** Published ports remain bound to `127.0.0.1`; authentication and TLS are still required before any larger network exposure.
 
-**False-positive notes:** This is an operational verification gap, not proof that the container configuration is vulnerable.
+**False-positive notes:** This closes the unstarted-container verification gap, not the remaining authentication, retention, provider-policy, or production-hardening gaps.
 
 ## Controls that passed review
 
@@ -129,6 +129,7 @@ Review date: 2026-10-22. Reviewed application scope: FastAPI API, Celery worker,
 - The SPA has no raw HTML sink, rejects non-HTTP(S) evidence links, and opens external links with `noopener noreferrer` and a no-referrer policy (`frontend/src/components/evidence-link.tsx`).
 - CSV cells beginning with formula prefixes are neutralized, and exports use parameterized ORM queries and fixed field names (`backend/app/services/exporting.py`, `backend/app/services/exports.py`).
 - Production rejects placeholder or short `APP_SECRET_KEY` values (`backend/app/core/config.py`), and Compose ports bind to loopback.
+- The Docker stack builds and runs with healthy dependencies, successful migrations, a consuming Celery worker, a non-root API/worker user, a working Nginx proxy, and restrictive security headers.
 - Unused table, chart, and date dependencies were removed, reducing the frontend dependency surface from the initial install.
 - Request IDs, safe error envelopes, redaction of sensitive log keys, no debug docs in production, Trusted Host validation, and restrictive CORS are present.
 
@@ -137,11 +138,13 @@ Review date: 2026-10-22. Reviewed application scope: FastAPI API, Celery worker,
 ```text
 backend full suite: 65 passed
 backend ruff check / ruff format --check / mypy: passed
-frontend lint / typecheck / Vitest / production build: passed after dependency cleanup (5 tests)
+frontend lint / typecheck / Vitest 4.1.12 / production build: passed after dependency remediation (5 tests)
+online npm audit: 0 vulnerabilities across 528 dependencies; Docker npm ci also reported 0
 offline smoke: 30 sources, 30 pain points, 30 persisted evidence records, separate scores, CSV/JSON/Markdown exports passed
 OpenAPI snapshot check: passed
 Compose configuration parse: passed
 browser flow: demo job, 30-row workbench, evidence detail, three score panels, SSRF error, CSV download: passed
+Compose runtime: five services up; migrations, worker consumption, Nginx proxy, headers, 30-source demo, exports, and SSRF rejection passed
 ```
 
-The unresolved registry-backed npm audit and the unstarted Docker stack are explicitly excluded from the passing claims. Compose configuration parsing is not evidence that the containers, migrations, worker, proxy, or headers work at runtime.
+The registry-backed audit is current for this lockfile, but it remains a recurring CI gate rather than a permanent guarantee.

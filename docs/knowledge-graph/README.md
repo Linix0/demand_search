@@ -86,17 +86,17 @@ Event rules:
 
 ## Current coverage
 
-The canonical Phase 1 graph includes 242 nodes, 365 edges, and 22 events:
+The canonical Phase 1 graph includes 243 nodes, 371 edges, and 24 events:
 
 - Requirements `R-000` through `R-026`, covering all 26 numbered specification sections plus section 0.
 - Goals and product principles.
 - Architecture decisions and selected technologies.
 - Runtime components, data entities, security controls, phases, acceptance criteria, and risks.
 - Installed skills with provenance and local paths.
-- Work events for repository inspection, specification movement/analysis, skill installation, technology selection, standards, Phase 0/1 implementation, security remediation, offline smoke/browser verification, and validation.
-- Open questions and next actions for Docker runtime verification, real-provider policy onboarding, authentication, retention enforcement, online dependency audit, clustering, and Phase 2.
+- Work events for repository inspection, specification movement/analysis, skill installation, technology selection, standards, Phase 0/1 implementation, security remediation, offline smoke/browser verification, Docker runtime verification, and validation.
+- Open questions and next actions for real-provider policy onboarding, authentication, retention enforcement, recurring dependency audit, clustering, and Phase 2.
 
-The runtime status is `phase1_local_loopback_verified`. This means the offline evidence loop and React workbench were executed against local services and exercised in a real browser. It does not claim that the Docker stack or real providers are runtime-verified.
+The runtime status is `phase1_docker_loopback_verified`. This means the Docker Compose stack, migrations, Celery worker, Nginx proxy, offline evidence loop, exports, security headers, and React workbench were executed on the loopback interface and exercised in a real browser. It does not claim that real providers or production hardening are runtime-verified.
 
 ## Update workflow
 

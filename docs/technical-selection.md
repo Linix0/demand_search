@@ -153,7 +153,7 @@ Status: accepted for Phase 1.
 
 The workbench uses React function components, TanStack Query, React Router, React Hook Form, Zod, Tailwind CSS, and small repository-local primitives modeled on shadcn/ui. The current components do not require Radix runtime packages, `components.json`, TanStack Table, Recharts, or `date-fns`; those unused dependencies were removed to reduce supply-chain and build surface. Add a dependency only when a concrete component needs it, and record the purpose and security implication in the graph.
 
-The Phase 1 lockfile installs React 19.3, TypeScript 5.9, Vite 6.4.5, Vitest 3.2, Tailwind 4.3, TanStack Query 5.104, and React Router 7.18. Vite 7 is deferred until the Node runtime is upgraded and the full browser/quality suite is rerun.
+The Phase 1 lockfile installs React 19.3, TypeScript 5.9, Vite 6.4.5, Vitest 4.1.12, Tailwind 4.3, TanStack Query 5.104, and React Router 7.18. Vitest 4.1.12 preserves Node 20 support while remediating the current mock/pool advisories; `@testing-library/dom` is declared explicitly as the Testing Library peer. Vite 7 is deferred until the Node runtime is upgraded and the full browser/quality suite is rerun.
 
 ## Proposed dependency sets
 

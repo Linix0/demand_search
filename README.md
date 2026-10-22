@@ -12,8 +12,9 @@
 - Mock Search 与 Mock LLM 离线路径：创建任务后可完成“搜索 → 来源 → 候选 → 引用校验 → 独立评分 → 人工复核 → 导出”。
 - React 19 + TypeScript + Vite 工作台：任务、痛点、证据详情、来源、复核、合并、批注和报告导出。
 - OpenAPI 快照与生成类型：`frontend/openapi.json`、`frontend/src/api/schema.d.ts`。
-- Docker Compose 配置：`api`、`worker`、`postgres`、`redis`、`web`，端口仅绑定回环地址。
+- Docker Compose 本地栈：`api`、`worker`、`postgres`、`redis`、`web` 五个服务已实际启动；迁移、健康检查、Celery 消费、Nginx 代理、安全响应头和非 root 后端进程均已验证，端口仅绑定回环地址。
 - 安全基线：SSRF 校验、重定向逐跳校验、对端 IP 失败关闭、引用确定性校验、独立评分、CSV 公式中和、前端外链校验和 CSP。
+- 依赖安全：在线 npm 审计为 0 漏洞；`vitest` 已升级到 4.1.12，并显式声明 Testing Library 的 DOM peer 依赖。
 - 安全审查与威胁模型：`docs/security-best-practices-report.md`、`demand_search-threat-model.md`。
 
 仍明确未完成或未验证：
@@ -21,8 +22,6 @@
 - 真实搜索、论坛、GitHub、Reddit 和真实 LLM Provider 默认禁用，尚未做条款/robots 预检。
 - API 没有认证和多用户授权；当前只适用于本地单用户，不能暴露到局域网或公网。
 - 保留期字段已写入，但尚无自动删除/匿名化任务。
-- Docker 栈未在本环境实际启动验证；只确认了 Compose 配置可解析。
-- 在线 npm 漏洞库审计受网络限制未完成；移除未使用依赖后本地审计报告 0（536 个依赖），仍需在 CI 做在线复核。
 
 设计与治理文档：
 
@@ -31,6 +30,7 @@
 - 需求分析与实施边界：[`docs/requirements-analysis.md`](docs/requirements-analysis.md)
 - 系统架构与数据流：[`docs/architecture.md`](docs/architecture.md)
 - 证据、来源与安全规则：[`docs/evidence-and-security.md`](docs/evidence-and-security.md)
+- Docker 运行验证记录：[`docs/runtime-verification.md`](docs/runtime-verification.md)
 - 工程编码规范：[`AGENTS.md`](AGENTS.md)
 - 项目知识图谱：[`docs/knowledge-graph/README.md`](docs/knowledge-graph/README.md)
 - 已安装 Codex 技能：`playwright`、`security-best-practices`、`security-threat-model`
@@ -76,6 +76,7 @@ $env:NODE_OPTIONS='--preserve-symlinks-main'
 npm run lint
 npm run typecheck
 npm run test
+npm audit --json
 npm run build
 ```
 
@@ -87,14 +88,14 @@ cd frontend
 npm run api:types
 ```
 
-Compose：
+Compose（先启动 Docker Desktop）：
 
 ```powershell
-docker compose config --quiet
-docker compose up --build
+docker compose up --build -d
+docker compose ps
 ```
 
-本地 Compose 端口为 `127.0.0.1:8080`（Web）和 `127.0.0.1:8000`（API）。当前开发环境没有可用的 Docker daemon，因此没有执行 `docker compose up --build`。
+本地 Compose 端口为 `127.0.0.1:8080`（Web）和 `127.0.0.1:8000`（API）。2026-10-22 已实际执行构建与启动：五个服务健康，Alembic 迁移成功，Celery Worker 消费了离线任务，Nginx 的健康检查、OpenAPI 代理与安全响应头通过验证。完整命令、计数和浏览器结果见 `docs/runtime-verification.md`。停止栈使用 `docker compose down`。
 
 ## 安全边界
 

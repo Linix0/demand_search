@@ -247,6 +247,7 @@ flowchart LR
     nART_024["ART-024<br/>Offline demo smoke script"]
     nART_025["ART-025<br/>Backend test suite entrypoint"]
     nART_026["ART-026<br/>Frontend test suite entrypoint"]
+    nART_027["ART-027<br/>Docker runtime verification record"]
   end
   subgraph sg_risk["Risks"]
     nRISK_001["RISK-001<br/>LLM fabricates evidence, URLs, or timestamps"]
@@ -265,7 +266,7 @@ flowchart LR
     nRISK_014["RISK-014<br/>Unauthenticated API and missing workspace authorization"]
     nRISK_015["RISK-015<br/>Robots and terms preflight missing"]
     nRISK_016["RISK-016<br/>Retention deletion not implemented"]
-    nRISK_017["RISK-017<br/>Registry-backed npm audit not verified"]
+    nRISK_017["RISK-017<br/>Dependency advisory drift"]
     nRISK_018["RISK-018<br/>Docker runtime not verified"]
   end
   nR_001 -->|implements| nGOAL_001
@@ -608,6 +609,11 @@ flowchart LR
   nSEC_020 -->|constrains| nCOMP_039
   nSEC_020 -->|mitigates| nRISK_014
   nSEC_020 -->|mitigates| nRISK_018
+  nCOMP_039 -->|validated_by| nACC_001
+  nCOMP_041 -->|validated_by| nACC_001
+  nCOMP_039 -->|mitigates| nRISK_018
+  nART_027 -->|documents| nCOMP_039
+  nART_027 -->|validated_by| nACC_010
   nSEC_008 -->|mitigates| nRISK_015
   nDEC_018 -->|constrains| nCOMP_029
   nDEC_018 -->|mitigates| nRISK_011
@@ -616,6 +622,7 @@ flowchart LR
   nDEC_019 -->|mitigates| nRISK_014
   nDEC_020 -->|constrains| nCOMP_033
   nDEC_020 -->|mitigates| nRISK_017
+  nTECH_028 -->|mitigates| nRISK_017
   nART_017 -->|documents| nSEC_005
   nART_017 -->|documents| nRISK_014
   nART_017 -->|documents| nRISK_018
@@ -657,5 +664,5 @@ flowchart LR
   class nSKILL_001,nSKILL_002,nSKILL_003 skill
   class nPHASE_000,nPHASE_001,nPHASE_002,nPHASE_003,nPHASE_004,nPHASE_005 phase
   class nACC_001,nACC_002,nACC_003,nACC_004,nACC_005,nACC_006,nACC_007,nACC_008,nACC_009,nACC_010,nACC_011 acceptance
-  class nART_001,nART_002,nART_003,nART_004,nART_005,nART_006,nART_007,nART_008,nART_009,nART_010,nART_011,nART_012,nART_013,nART_014,nART_015,nART_016,nART_017,nART_018,nART_019,nART_020,nART_021,nART_022,nART_023,nART_024,nART_025,nART_026 artifact
+  class nART_001,nART_002,nART_003,nART_004,nART_005,nART_006,nART_007,nART_008,nART_009,nART_010,nART_011,nART_012,nART_013,nART_014,nART_015,nART_016,nART_017,nART_018,nART_019,nART_020,nART_021,nART_022,nART_023,nART_024,nART_025,nART_026,nART_027 artifact
   class nRISK_001,nRISK_002,nRISK_003,nRISK_004,nRISK_005,nRISK_006,nRISK_007,nRISK_008,nRISK_009,nRISK_010,nRISK_011,nRISK_012,nRISK_013,nRISK_014,nRISK_015,nRISK_016,nRISK_017,nRISK_018 risk
