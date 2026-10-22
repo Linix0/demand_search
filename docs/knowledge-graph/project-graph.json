@@ -5,7 +5,7 @@
     "name": "Industry Pain Radar",
     "repo": "demand_search",
     "description": "Evidence-driven industry pain-point research workbench.",
-    "as_of": "2026-10-22T22:57:52.460690+08:00",
+    "as_of": "2026-10-22T23:07:52.631495+08:00",
     "timezone": "Asia/Shanghai",
     "current_stage": "phase-1-local-evidence-loop",
     "runtime_status": "phase1_docker_loopback_verified",
@@ -5533,6 +5533,25 @@
         "RISK-001"
       ],
       "summary": "Payment evidence roles and commercial payment scoring now derive from verified quotes and deterministic affirmative rules; injected providers and per-source savepoints support regression testing."
+    },
+    {
+      "sequence": 28,
+      "at": "2026-10-22T23:07:52.631495+08:00",
+      "action": "sync_readme_and_graph_coverage_with_payment_evidence_control",
+      "status": "completed",
+      "result": "README now documents verified-quote payment evidence, and the knowledge-graph guide reflects the current graph size and payment-control event.",
+      "artifacts": [
+        "README.md",
+        "docs/knowledge-graph/README.md",
+        "docs/knowledge-graph/project-graph.json"
+      ],
+      "related_node_ids": [
+        "SEC-021",
+        "COMP-012",
+        "COMP-016",
+        "RISK-001"
+      ],
+      "summary": "Synchronized user-facing and graph-reading documentation with the accepted payment-evidence rule."
     }
   ],
   "open_questions": [

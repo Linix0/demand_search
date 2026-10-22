@@ -14,6 +14,7 @@
 - OpenAPI 快照与生成类型：`frontend/openapi.json`、`frontend/src/api/schema.d.ts`。
 - Docker Compose 本地栈：`api`、`worker`、`postgres`、`redis`、`web` 五个服务已实际启动；迁移、健康检查、Celery 消费、Nginx 代理、安全响应头和非 root 后端进程均已验证，端口仅绑定回环地址。
 - 安全基线：SSRF 校验、重定向逐跳校验、对端 IP 失败关闭、引用确定性校验、独立评分、CSV 公式中和、前端外链校验和 CSP。
+- 支付证据：只有精确或规范化匹配的持久化引用，且通过确定性肯定规则，才能成为支付信号；模型标签和仅搜索摘要匹配不足以判定。
 - 依赖安全：在线 npm 审计为 0 漏洞；`vitest` 已升级到 4.1.12，并显式声明 Testing Library 的 DOM peer 依赖。
 - 安全审查与威胁模型：`docs/security-best-practices-report.md`、`demand_search-threat-model.md`。
 

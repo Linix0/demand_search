@@ -86,14 +86,16 @@ Event rules:
 
 ## Current coverage
 
-The canonical Phase 1 graph includes 244 nodes, 374 edges, and 26 events:
+The canonical Phase 1 graph includes 245 nodes, 377 edges, and 28 events:
 
 - Requirements `R-000` through `R-026`, covering all 26 numbered specification sections plus section 0.
 - Goals and product principles.
 - Architecture decisions and selected technologies.
 - Runtime components, data entities, security controls, phases, acceptance criteria, and risks.
 - Installed skills with provenance and local paths.
-- Work events for repository inspection, specification movement/analysis, skill installation, technology selection, standards, Phase 0/1 implementation, security remediation, offline smoke/browser verification, Docker runtime verification, and validation.\n- State-machine hardening for research-job controls, atomic worker claims, duplicate Celery delivery, concurrent pause/cancel safety, and shared source membership across jobs.
+- Work events for repository inspection, specification movement/analysis, skill installation, technology selection, standards, Phase 0/1 implementation, security remediation, offline smoke/browser verification, Docker runtime verification, and validation.
+- State-machine hardening for research-job controls, atomic worker claims, duplicate Celery delivery, concurrent pause/cancel safety, and shared source membership across jobs.
+- Deterministic payment-evidence derivation from verified quotes, with per-source persistence isolation and regression coverage.
 - Open questions and next actions for real-provider policy onboarding, authentication, retention enforcement, recurring dependency audit, clustering, and Phase 2.
 
 The runtime status is `phase1_docker_loopback_verified`. This means the Docker Compose stack, migrations, Celery worker, Nginx proxy, offline evidence loop, exports, security headers, and React workbench were executed on the loopback interface and exercised in a real browser. It does not claim that real providers or production hardening are runtime-verified.
