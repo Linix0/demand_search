@@ -248,6 +248,7 @@ flowchart LR
     nART_025["ART-025<br/>Backend test suite entrypoint"]
     nART_026["ART-026<br/>Frontend test suite entrypoint"]
     nART_027["ART-027<br/>Docker runtime verification record"]
+    nEVID_026["EVID-026<br/>Research job state-machine tests"]
   end
   subgraph sg_risk["Risks"]
     nRISK_001["RISK-001<br/>LLM fabricates evidence, URLs, or timestamps"]
@@ -640,6 +641,9 @@ flowchart LR
   nACC_011 -->|validated_by| nART_026
   nTECH_036 -->|supports| nCOMP_040
   nTECH_037 -->|constrains| nCOMP_033
+  nEVID_026 -->|validated_by| nSEC_013
+  nCOMP_007 -->|validated_by| nEVID_026
+  nCOMP_003 -->|validated_by| nEVID_026
   classDef goal fill:#fff3bf,stroke:#b08900,color:#3d3200
   classDef principle fill:#e7f5ff,stroke:#1971c2,color:#0b2e4f
   classDef requirement fill:#f1f3f5,stroke:#495057,color:#212529
@@ -664,5 +668,5 @@ flowchart LR
   class nSKILL_001,nSKILL_002,nSKILL_003 skill
   class nPHASE_000,nPHASE_001,nPHASE_002,nPHASE_003,nPHASE_004,nPHASE_005 phase
   class nACC_001,nACC_002,nACC_003,nACC_004,nACC_005,nACC_006,nACC_007,nACC_008,nACC_009,nACC_010,nACC_011 acceptance
-  class nART_001,nART_002,nART_003,nART_004,nART_005,nART_006,nART_007,nART_008,nART_009,nART_010,nART_011,nART_012,nART_013,nART_014,nART_015,nART_016,nART_017,nART_018,nART_019,nART_020,nART_021,nART_022,nART_023,nART_024,nART_025,nART_026,nART_027 artifact
+  class nART_001,nART_002,nART_003,nART_004,nART_005,nART_006,nART_007,nART_008,nART_009,nART_010,nART_011,nART_012,nART_013,nART_014,nART_015,nART_016,nART_017,nART_018,nART_019,nART_020,nART_021,nART_022,nART_023,nART_024,nART_025,nART_026,nART_027,nEVID_026 artifact
   class nRISK_001,nRISK_002,nRISK_003,nRISK_004,nRISK_005,nRISK_006,nRISK_007,nRISK_008,nRISK_009,nRISK_010,nRISK_011,nRISK_012,nRISK_013,nRISK_014,nRISK_015,nRISK_016,nRISK_017,nRISK_018 risk

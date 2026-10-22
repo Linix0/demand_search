@@ -74,9 +74,9 @@ export function JobDetailPage() {
   }
 
   const data = job.data;
-  const canStart = ["draft", "queued", "failed"].includes(data.status);
+  const canStart = ["draft", "failed"].includes(data.status);
   const canPause = ["queued", "running"].includes(data.status);
-  const canResume = ["paused", "queued"].includes(data.status);
+  const canResume = data.status === "paused";
   const canCancel = !["completed", "cancelled", "completed_with_errors"].includes(data.status);
   const canRetry = data.status === "failed" || data.status === "completed_with_errors";
 
@@ -205,7 +205,7 @@ export function JobDetailPage() {
               <Button variant="secondary" className="w-full">查看来源池</Button>
             </Link>
             <div className="rounded-xl bg-slate-50 p-3 text-xs leading-5 text-muted">
-              Provider 失败不会抹掉已持久化证据。重试时服务端从首个未完成阶段恢复，不重复写入相同来源。
+              Provider 失败不会抹掉已持久化证据。重复执行使用持久化状态进行原子认领，不重复消费同一队列消息。
             </div>
           </CardContent>
         </Card>

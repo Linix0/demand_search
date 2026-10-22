@@ -71,6 +71,7 @@ Status: accepted.
 Celery handles research jobs, fetch/extract/score stages, retries, and worker lifecycle. Redis is the broker and optional result transport. `research_jobs`, `research_job_logs`, `source_items`, `pain_points`, and `provider_usage_records` are the durable truth in PostgreSQL. A worker restart must be able to reconstruct progress from the database.
 
 On Windows, run Celery through the Linux Docker image. Native Windows worker execution is not a supported production path.
+Job lifecycle: start, resume, and retry are explicit conditional transitions. A job is claimed by the worker only when it is `queued`; the claim is one atomic `queued -> running` update. Celery renders a stable task ID for each durable job, and duplicate deliveries are harmless because they see a non-`queued` state and return. The pipeline checks that the job is still `running` before finalization and failure handling, so an operator pause or cancel is not overwritten. Orphaned-`running` recovery remains future work.
 
 ### ADR-004: Provider adapters at every external boundary
 

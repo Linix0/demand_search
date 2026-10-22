@@ -122,11 +122,13 @@ Each stage receives a persisted job and stage context, performs bounded work, an
 
 ### Idempotency and recovery
 
-- Job start uses a compare-and-set transition from `draft`/`paused` to `queued`.
+- Job controls use conditional database updates: start accepts only `draft`/`failed`, resume only `paused`, and retry only `failed`/`completed_with_errors`; invalid or duplicate requests return `409 CONFLICT`.
+- The worker performs an atomic `queued -> running` claim. Duplicate broker deliveries, paused jobs, cancelled jobs, and terminal jobs return without starting another pipeline run.
+- The pipeline re-reads status before finalization and failure handling; a concurrent pause or cancel is never overwritten by a later completion update.
 - A stage records its input count, output count, attempt, and completion marker.
 - Unique keys prevent duplicate source/evidence writes.
-- A retry resumes from the first incomplete stage or explicit failed item.
-- A process restart marks an orphaned `running` job as resumable or interrupted; it must not silently duplicate work.
+- A retry currently reopens failed work through the same durable-state boundary; resuming from fine-grained incomplete stages remains future work.
+- A process restart must mark an orphaned `running` job as resumable or interrupted; automatic orphan recovery is not yet implemented.
 - Exported files are content-addressed or versioned and can be regenerated.
 
 ## Provider interfaces

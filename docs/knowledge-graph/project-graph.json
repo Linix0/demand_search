@@ -5,7 +5,7 @@
     "name": "Industry Pain Radar",
     "repo": "demand_search",
     "description": "Evidence-driven industry pain-point research workbench.",
-    "as_of": "2026-10-22T21:43:58.410042+08:00",
+    "as_of": "2026-10-22T22:19:19.8697559+08:00",
     "timezone": "Asia/Shanghai",
     "current_stage": "phase-1-local-evidence-loop",
     "runtime_status": "phase1_docker_loopback_verified",
@@ -1143,7 +1143,7 @@
       "id": "COMP-003",
       "type": "component",
       "title": "Celery worker",
-      "summary": "Worker entrypoint implemented; it delegates research work to the same domain services. The container connected to Redis, subscribed to the celery queue, and consumed a demo job during runtime verification.",
+      "summary": "Celery worker entrypoint delegates to the same domain services, applies an atomic queued claim, and safely returns duplicate deliveries. Redis remains transport; PostgreSQL remains durable job state.",
       "status": "runtime_verified",
       "source_refs": [
         "spec:§6",
@@ -1188,7 +1188,7 @@
       "id": "COMP-007",
       "type": "component",
       "title": "Research orchestrator",
-      "summary": "Owns job stage transitions, limits, recovery, partial completion, and audit summaries.",
+      "summary": "Owns validated job controls and atomic queued-to-running claims, pause/cancel-safe finalization, bounded stage execution, and audit summaries. Automatic orphaned-running recovery and stage-level resume remain future work.",
       "status": "planned",
       "source_refs": [
         "spec:§6",
@@ -1870,7 +1870,7 @@
       "id": "SEC-013",
       "type": "security_control",
       "title": "Idempotency and unique constraints",
-      "summary": "Prevent duplicate sources, evidence, scores, and stage work under retries and restarts.",
+      "summary": "Conditional job transitions, atomic worker claims, stable task IDs, and unique source/evidence constraints prevent duplicate work under repeated delivery and retries.",
       "status": "implemented",
       "source_refs": [
         "spec:§6.4",
@@ -2566,7 +2566,7 @@
       "id": "RISK-010",
       "type": "risk",
       "title": "Task retry duplicates work",
-      "summary": "Worker retries or restarts could duplicate sources, evidence, or scores.",
+      "summary": "Worker retries or restarts could duplicate sources, evidence, or scores. Stable task IDs, conditional state claims, duplicate-source handling, and integration tests reduce duplicate broker delivery and repeated pipeline execution.",
       "status": "tracked",
       "source_refs": [
         "spec:§6.4"
@@ -2655,6 +2655,17 @@
         "docs/security-best-practices-report.md#sec-007",
         "docs/runtime-verification.md"
       ]
+    },
+    {
+      "status": "verified",
+      "title": "Research job state-machine tests",
+      "summary": "Integration coverage for conditional start/resume/retry transitions, duplicate delivery, and pause-safe pipeline claiming.",
+      "source_refs": [
+        "docs/architecture.md#idempotency-and-recovery"
+      ],
+      "type": "artifact",
+      "id": "EVID-026",
+      "path": "backend/tests/integration/test_job_state.py"
     }
   ],
   "edges": [
@@ -4883,6 +4894,24 @@
       "to": "COMP-033",
       "type": "constrains",
       "note": "Phase 1 frontend tooling must support Node 20.15."
+    },
+    {
+      "from": "EVID-026",
+      "to": "SEC-013",
+      "type": "validated_by",
+      "note": "State transitions and duplicate delivery are covered by integration tests."
+    },
+    {
+      "from": "COMP-007",
+      "to": "EVID-026",
+      "type": "validated_by",
+      "note": "Atomic queued claim and pause-safe finalization."
+    },
+    {
+      "from": "COMP-003",
+      "to": "EVID-026",
+      "type": "validated_by",
+      "note": "Duplicate Celery delivery exits without rerunning."
     }
   ],
   "events": [
@@ -5426,6 +5455,30 @@
         "backend/alembic/versions/93c2f682d853_add_research_job_sources.py"
       ],
       "related_node_ids": []
+    },
+    {
+      "sequence": 26,
+      "at": "2026-10-22T22:19:19.8738207+08:00",
+      "action": "harden_research_job_state_transitions",
+      "status": "completed",
+      "summary": "Replaced start/resume/retry read-then-write controls with conditional SQL updates; start now accepts only draft/failed, resume only paused, retry only failed/completed_with_errors. Added atomic queued-to-running worker claim, stable Celery task IDs, duplicate-delivery guards, and re-reads before finalization/failure so concurrent pause/cancel is preserved. Added API/integration tests for 409 conflicts, concurrent start, paused non-claim, and duplicate delivery. Ruff check, Ruff format check, mypy, and 70 pytest tests passed; frontend lint/typecheck/5 tests/build and knowledge-graph validation/render checks passed. Vite reported only a non-blocking 500 kB chunk-size warning.",
+      "artifacts": [
+        "backend/app/services/jobs.py",
+        "backend/app/services/pipeline.py",
+        "backend/app/tasks/jobs.py",
+        "backend/tests/integration/test_job_state.py",
+        "frontend/src/features/research-jobs/job-detail-page.tsx",
+        "docs/architecture.md",
+        "docs/technical-selection.md",
+        "docs/knowledge-graph/project-graph.json"
+      ],
+      "related_node_ids": [
+        "COMP-003",
+        "COMP-007",
+        "SEC-013",
+        "RISK-010",
+        "EVID-026"
+      ]
     }
   ],
   "open_questions": [

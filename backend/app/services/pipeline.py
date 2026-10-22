@@ -9,7 +9,7 @@ from urllib.parse import urlsplit
 
 import structlog
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
-from sqlalchemy import select
+from sqlalchemy import CursorResult, select, update
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
@@ -247,10 +247,31 @@ def _evidence_type(candidate: CandidatePayload) -> EvidenceType:
 def run_research_job(session: Session, job: ResearchJob, settings: Settings) -> ResearchJob:
     """Run the Mock-first bounded pipeline and persist every stage outcome."""
 
-    if job.status in {JobStatus.CANCELLED, JobStatus.COMPLETED, JobStatus.COMPLETED_WITH_ERRORS}:
+    if job.status != JobStatus.QUEUED:
         return job
     if settings.search_provider_default != "mock" or settings.llm_provider != "mock":
         raise ValueError("Phase 1 supports only the Mock search and LLM providers")
+
+    claim = session.execute(
+        update(ResearchJob)
+        .where(ResearchJob.id == job.id, ResearchJob.status == JobStatus.QUEUED)
+        .values(
+            status=JobStatus.RUNNING,
+            stage=JobStage.QUERY_PLANNING,
+            started_at=job.started_at or datetime.now(UTC),
+            finished_at=None,
+            error_summary=None,
+            progress_percent=5,
+        )
+        .execution_options(synchronize_session=False)
+    )
+    assert isinstance(claim, CursorResult)
+    if claim.rowcount != 1:
+        session.rollback()
+        session.refresh(job)
+        return job
+    session.commit()
+    session.refresh(job)
 
     search_provider = MockSearchProvider()
     llm_provider = MockLLMProvider()
@@ -267,14 +288,8 @@ def run_research_job(session: Session, job: ResearchJob, settings: Settings) -> 
     job.extracted_pain_point_count = job.extracted_pain_point_count or 0
     job.verified_evidence_count = job.verified_evidence_count or 0
 
-    job.status = JobStatus.RUNNING
-    job.stage = JobStage.QUERY_PLANNING
-    job.started_at = job.started_at or datetime.now(UTC)
-    job.error_summary = None
-    job.progress_percent = 5
     add_job_log(session, job, stage="query_planning", message="Research job started.")
     session.commit()
-
     try:
         queries = _build_queries(config)
         if not queries:
@@ -453,6 +468,16 @@ def run_research_job(session: Session, job: ResearchJob, settings: Settings) -> 
             job.progress_percent = min(85, 18 + int(60 * job.processed_query_count / progress_span))
             session.commit()
 
+        session.refresh(job)
+        if job.status != JobStatus.RUNNING:
+            add_job_log(
+                session,
+                job,
+                stage=job.stage.value,
+                message="Job stopped before completion.",
+            )
+            session.commit()
+            return job
         job.stage = JobStage.COMPLETED
         job.progress_percent = 100
         job.verified_evidence_count = verified_evidence_count
@@ -482,6 +507,8 @@ def run_research_job(session: Session, job: ResearchJob, settings: Settings) -> 
     except Exception as exc:
         session.rollback()
         job = session.get(ResearchJob, job.id) or job
+        if job.status != JobStatus.RUNNING:
+            return job
         job.status = JobStatus.FAILED
         job.error_summary = "Research pipeline failed; inspect job logs."
         job.finished_at = datetime.now(UTC)

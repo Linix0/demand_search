@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import CursorResult, select, update
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
@@ -113,38 +113,88 @@ def add_job_log(
     )
 
 
-def start_job(session: Session, job_id: uuid.UUID, settings: Settings) -> ResearchJob:
-    job = get_job_or_error(session, job_id)
-    if job.status not in {JobStatus.DRAFT, JobStatus.QUEUED, JobStatus.FAILED}:
+def _transition_job(
+    session: Session,
+    job: ResearchJob,
+    *,
+    action: str,
+    allowed_statuses: set[JobStatus],
+    values: dict[str, object],
+    conflict_message: str,
+) -> ResearchJob:
+    before = job.status.value
+    result = session.execute(
+        update(ResearchJob)
+        .where(ResearchJob.id == job.id, ResearchJob.status.in_(allowed_statuses))
+        .values(**values)
+        .execution_options(synchronize_session=False)
+    )
+    assert isinstance(result, CursorResult)
+    if result.rowcount != 1:
+        session.rollback()
+        session.refresh(job)
         raise AppError(
             "CONFLICT",
-            "Only draft, queued, or failed jobs can be started.",
+            conflict_message,
             status_code=409,
             details={"status": job.status.value},
         )
-    before = job.status.value
-    job.status = JobStatus.QUEUED
-    job.paused_at = None
     write_audit(
         session,
-        action="job_started",
+        action=action,
         entity_type="research_job",
         entity_id=job.id,
         before_state={"status": before},
-        after_state={"status": job.status.value},
+        after_state={"status": str(values["status"])},
     )
     session.commit()
     session.refresh(job)
+    return job
 
+
+def _dispatch_or_run(session: Session, job: ResearchJob, settings: Settings) -> ResearchJob:
     if settings.task_execution_mode == "celery":
         from app.tasks.jobs import enqueue_research_job
 
         enqueue_research_job(str(job.id))
         return job
-
     from app.services.pipeline import run_research_job
 
     return run_research_job(session, job, settings)
+
+
+def _open_job(
+    session: Session,
+    job_id: uuid.UUID,
+    settings: Settings,
+    *,
+    action: str,
+    allowed_statuses: set[JobStatus],
+    values: dict[str, object],
+    conflict_message: str,
+) -> ResearchJob:
+    job = get_job_or_error(session, job_id)
+    job = _transition_job(
+        session,
+        job,
+        action=action,
+        allowed_statuses=allowed_statuses,
+        values={"status": JobStatus.QUEUED, "finished_at": None, **values},
+        conflict_message=conflict_message,
+    )
+    return _dispatch_or_run(session, job, settings)
+
+
+def start_job(session: Session, job_id: uuid.UUID, settings: Settings) -> ResearchJob:
+    return _open_job(
+        session,
+        job_id,
+        settings,
+        action="job_started",
+        allowed_statuses={JobStatus.DRAFT, JobStatus.FAILED},
+        values={"paused_at": None},
+        conflict_message="Only draft or failed jobs can be started.",
+    )
 
 
 def pause_job(session: Session, job_id: uuid.UUID) -> ResearchJob:
@@ -168,30 +218,15 @@ def pause_job(session: Session, job_id: uuid.UUID) -> ResearchJob:
 
 
 def resume_job(session: Session, job_id: uuid.UUID, settings: Settings) -> ResearchJob:
-    job = get_job_or_error(session, job_id)
-    if job.status not in {JobStatus.PAUSED, JobStatus.QUEUED}:
-        raise AppError("CONFLICT", "Only paused or queued jobs can be resumed.", status_code=409)
-    prior = job.status.value
-    job.status = JobStatus.QUEUED
-    job.paused_at = None
-    write_audit(
+    return _open_job(
         session,
+        job_id,
+        settings,
         action="job_resumed",
-        entity_type="research_job",
-        entity_id=job.id,
-        before_state={"status": prior},
-        after_state={"status": job.status.value},
+        allowed_statuses={JobStatus.PAUSED},
+        values={"paused_at": None},
+        conflict_message="Only paused jobs can be resumed.",
     )
-    session.commit()
-    session.refresh(job)
-    if settings.task_execution_mode == "celery":
-        from app.tasks.jobs import enqueue_research_job
-
-        enqueue_research_job(str(job.id))
-        return job
-    from app.services.pipeline import run_research_job
-
-    return run_research_job(session, job, settings)
 
 
 def cancel_job(session: Session, job_id: uuid.UUID) -> ResearchJob:
@@ -227,31 +262,12 @@ def duplicate_job(session: Session, job_id: uuid.UUID) -> ResearchJob:
 
 
 def retry_failed_job(session: Session, job_id: uuid.UUID, settings: Settings) -> ResearchJob:
-    job = get_job_or_error(session, job_id)
-    if job.status not in {JobStatus.FAILED, JobStatus.COMPLETED_WITH_ERRORS}:
-        raise AppError(
-            "CONFLICT",
-            "Only failed or partially completed jobs can be retried.",
-            status_code=409,
-        )
-    prior = job.status.value
-    job.status = JobStatus.QUEUED
-    job.error_summary = None
-    write_audit(
+    return _open_job(
         session,
+        job_id,
+        settings,
         action="job_retried",
-        entity_type="research_job",
-        entity_id=job.id,
-        before_state={"status": prior},
-        after_state={"status": job.status.value},
+        allowed_statuses={JobStatus.FAILED, JobStatus.COMPLETED_WITH_ERRORS},
+        values={"error_summary": None},
+        conflict_message="Only failed or partially completed jobs can be retried.",
     )
-    session.commit()
-    session.refresh(job)
-    if settings.task_execution_mode == "celery":
-        from app.tasks.jobs import enqueue_research_job
-
-        enqueue_research_job(str(job.id))
-        return job
-    from app.services.pipeline import run_research_job
-
-    return run_research_job(session, job, settings)
