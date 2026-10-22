@@ -1,0 +1,99 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: industry_pain_radar
+      POSTGRES_USER: pain_radar
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local_pain_radar_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pain_radar -d industry_pain_radar"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ./backend
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      APP_SECRET_KEY: ${APP_SECRET_KEY:-local-compose-change-me}
+      APP_HOST: 0.0.0.0
+      APP_PORT: 8000
+      APP_TIMEZONE: Asia/Shanghai
+      APP_CORS_ORIGINS: http://localhost:8080,http://127.0.0.1:8080
+      ALLOWED_HOSTS: 127.0.0.1,localhost,api,web,testserver
+      DATABASE_URL: postgresql+psycopg://pain_radar:${POSTGRES_PASSWORD:-local_pain_radar_password}@postgres:5432/industry_pain_radar
+      REDIS_URL: redis://redis:6379/0
+      TASK_EXECUTION_MODE: celery
+      SEARCH_PROVIDER_DEFAULT: mock
+      LLM_PROVIDER: mock
+      LLM_API_KEY: ""
+      STORE_FULL_PAGE_TEXT: "false"
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ./backend
+    command: ["celery", "-A", "app.tasks.celery_app.celery_app", "worker", "--loglevel=INFO", "--queues=celery", "--concurrency=2"]
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      APP_SECRET_KEY: ${APP_SECRET_KEY:-local-compose-change-me}
+      APP_TIMEZONE: Asia/Shanghai
+      DATABASE_URL: postgresql+psycopg://pain_radar:${POSTGRES_PASSWORD:-local_pain_radar_password}@postgres:5432/industry_pain_radar
+      REDIS_URL: redis://redis:6379/0
+      TASK_EXECUTION_MODE: celery
+      SEARCH_PROVIDER_DEFAULT: mock
+      LLM_PROVIDER: mock
+      STORE_FULL_PAGE_TEXT: "false"
+    depends_on:
+      api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: ""
+    ports:
+      - "127.0.0.1:8080:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

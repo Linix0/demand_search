@@ -1,0 +1,11 @@
+.venv
+.local
+.pytest_cache
+.mypy_cache
+.ruff_cache
+tests
+**/__pycache__
+*.pyc
+*.sqlite
+*.sqlite3
+*.db

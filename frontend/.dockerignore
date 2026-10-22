@@ -1,0 +1,8 @@
+node_modules
+dist
+coverage
+.npm-cache
+playwright-report
+test-results
+openapi.json
+*.log
