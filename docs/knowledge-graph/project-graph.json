@@ -5,7 +5,7 @@
     "name": "Industry Pain Radar",
     "repo": "demand_search",
     "description": "Evidence-driven industry pain-point research workbench.",
-    "as_of": "2026-10-22T22:19:19.8697559+08:00",
+    "as_of": "2026-10-22T22:57:52.460690+08:00",
     "timezone": "Asia/Shanghai",
     "current_stage": "phase-1-local-evidence-loop",
     "runtime_status": "phase1_docker_loopback_verified",
@@ -1243,7 +1243,7 @@
       "id": "COMP-012",
       "type": "component",
       "title": "Structured LLM extractor",
-      "summary": "Strict candidate schema plus the Mock extractor are implemented; real model output remains untrusted.",
+      "summary": "Strict candidate schema plus Mock/dependency-injected extractors are implemented; model payment labels are hints only and never establish evidence.",
       "status": "implemented_mock_only",
       "source_refs": [
         "spec:§8",
@@ -1254,7 +1254,7 @@
       "id": "COMP-013",
       "type": "component",
       "title": "Evidence validator",
-      "summary": "Implemented deterministic quote/offset verification, source binding, caps, and review-state downgrade.",
+      "summary": "Implemented deterministic quote/offset verification plus narrow affirmative payment-signal detection; verified quotes alone can establish payment evidence.",
       "status": "implemented",
       "source_refs": [
         "spec:§5",
@@ -1287,7 +1287,7 @@
       "id": "COMP-016",
       "type": "component",
       "title": "Scoring service",
-      "summary": "Implemented deterministic evidence, commercial, and coverage scores with formula versions and append-only history.",
+      "summary": "Implemented deterministic evidence, commercial, and coverage scores with formula versions and append-only history; commercial scoring reads only persisted final evidence roles.",
       "status": "implemented",
       "source_refs": [
         "spec:§10",
@@ -1881,7 +1881,7 @@
       "id": "SEC-014",
       "type": "security_control",
       "title": "Strict schema and business validation",
-      "summary": "Reject unknown/malformed LLM output and invalid domain transitions before persistence.",
+      "summary": "Reject unknown/malformed LLM output and invalid domain transitions before persistence; model labels cannot forge payment evidence.",
       "status": "implemented",
       "source_refs": [
         "spec:§0.1",
@@ -2472,7 +2472,7 @@
       "id": "RISK-001",
       "type": "risk",
       "title": "LLM fabricates evidence, URLs, or timestamps",
-      "summary": "Untrusted model output could create false facts or misleading source links.",
+      "summary": "Untrusted model output could create false facts, misleading source links, or fabricated payment labels if its labels are trusted directly.",
       "status": "tracked",
       "source_refs": [
         "spec:§5",
@@ -2666,6 +2666,19 @@
       "type": "artifact",
       "id": "EVID-026",
       "path": "backend/tests/integration/test_job_state.py"
+    },
+    {
+      "id": "SEC-021",
+      "type": "security_control",
+      "title": "Program-derived payment evidence",
+      "summary": "Payment evidence requires a verified exact or normalized quote matching a narrow affirmative deterministic rule; model labels, snippets, negations, and hypotheticals are insufficient.",
+      "status": "implemented",
+      "source_refs": [
+        "docs/evidence-and-security.md",
+        "docs/technical-selection.md",
+        "backend/tests/unit/test_evidence.py",
+        "backend/tests/integration/test_research_flow.py"
+      ]
     }
   ],
   "edges": [
@@ -4912,6 +4925,21 @@
       "to": "EVID-026",
       "type": "validated_by",
       "note": "Duplicate Celery delivery exits without rerunning."
+    },
+    {
+      "from": "SEC-021",
+      "to": "COMP-012",
+      "type": "constrains"
+    },
+    {
+      "from": "SEC-021",
+      "to": "COMP-016",
+      "type": "constrains"
+    },
+    {
+      "from": "SEC-021",
+      "to": "RISK-001",
+      "type": "constrains"
     }
   ],
   "events": [
@@ -5479,6 +5507,32 @@
         "RISK-010",
         "EVID-026"
       ]
+    },
+    {
+      "sequence": 27,
+      "at": "2026-10-22T22:57:52.460690+08:00",
+      "action": "derive_payment_evidence_from_verified_quotes",
+      "status": "completed",
+      "result": "Payment evidence roles and commercial payment scoring now derive from verified quotes and deterministic affirmative rules; injected providers and per-source savepoints support regression testing.",
+      "artifacts": [
+        "backend/app/services/evidence.py",
+        "backend/app/services/pipeline.py",
+        "backend/tests/unit/test_evidence.py",
+        "backend/tests/unit/test_scoring.py",
+        "backend/tests/integration/test_research_flow.py",
+        "docs/technical-selection.md",
+        "docs/evidence-and-security.md",
+        "docs/knowledge-graph/project-graph.json"
+      ],
+      "related_node_ids": [
+        "COMP-012",
+        "COMP-013",
+        "COMP-016",
+        "SEC-014",
+        "SEC-021",
+        "RISK-001"
+      ],
+      "summary": "Payment evidence roles and commercial payment scoring now derive from verified quotes and deterministic affirmative rules; injected providers and per-source savepoints support regression testing."
     }
   ],
   "open_questions": [

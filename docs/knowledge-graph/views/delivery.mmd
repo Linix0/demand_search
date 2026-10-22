@@ -21,6 +21,7 @@ flowchart LR
     nSEC_018["SEC-018<br/>Fail-closed connected-peer verification"]
     nSEC_019["SEC-019<br/>Production secret strength validation"]
     nSEC_020["SEC-020<br/>Loopback-only local deployment boundary"]
+    nSEC_021["SEC-021<br/>Program-derived payment evidence"]
   end
   subgraph sg_skill["Codex skills"]
     nSKILL_001["SKILL-001<br/>playwright"]
@@ -115,12 +116,13 @@ flowchart LR
   nSEC_020 -->|mitigates| nRISK_014
   nSEC_020 -->|mitigates| nRISK_018
   nSEC_008 -->|mitigates| nRISK_015
+  nSEC_021 -->|constrains| nRISK_001
   classDef security_control fill:#ffe3e3,stroke:#c92a2a,color:#4a0b0b
   classDef skill fill:#e6fff8,stroke:#0b7285,color:#043b43
   classDef phase fill:#edf2ff,stroke:#364fc7,color:#182558
   classDef acceptance fill:#e7f5ff,stroke:#1c7ed6,color:#0b3c63
   classDef risk fill:#fff5f5,stroke:#e03131,color:#4d0c0c
-  class nSEC_001,nSEC_002,nSEC_003,nSEC_004,nSEC_005,nSEC_006,nSEC_007,nSEC_008,nSEC_009,nSEC_010,nSEC_011,nSEC_012,nSEC_013,nSEC_014,nSEC_015,nSEC_016,nSEC_017,nSEC_018,nSEC_019,nSEC_020 security_control
+  class nSEC_001,nSEC_002,nSEC_003,nSEC_004,nSEC_005,nSEC_006,nSEC_007,nSEC_008,nSEC_009,nSEC_010,nSEC_011,nSEC_012,nSEC_013,nSEC_014,nSEC_015,nSEC_016,nSEC_017,nSEC_018,nSEC_019,nSEC_020,nSEC_021 security_control
   class nSKILL_001,nSKILL_002,nSKILL_003 skill
   class nPHASE_000,nPHASE_001,nPHASE_002,nPHASE_003,nPHASE_004,nPHASE_005 phase
   class nACC_001,nACC_002,nACC_003,nACC_004,nACC_005,nACC_006,nACC_007,nACC_008,nACC_009,nACC_010,nACC_011 acceptance

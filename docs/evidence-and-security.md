@@ -112,6 +112,17 @@ Guardrails:
 - More competitors is not automatically worse; evaluate positioning, channel, price, and unmet need.
 - Likes/comments must not be converted into revenue, TAM, or market size.
 
+### Payment evidence guardrails
+
+Payment evidence is program-derived, never model-declared:
+
+- A model `payment_signal=explicit` label alone is ignored.
+- `payment_signal` evidence requires a quote with `exact_match` or `normalized_match`.
+- The verified quote must match a narrow affirmative deterministic rule.
+- Negated and hypothetical payment language is excluded.
+- A `snippet_only` quote may be supporting evidence but cannot establish payment willingness.
+- Commercial scoring reads only the persisted final `evidence_role`.
+
 ### Coverage (0-100)
 
 Coverage is not opportunity. Default composition: independent sources 30%, source-type diversity 20%, domain/community diversity 15%, time coverage 10%, target-user clarity 10%, competitor research completeness 10%, completed interviews/direct feedback 5%.

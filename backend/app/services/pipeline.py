@@ -32,9 +32,9 @@ from app.models.source import (
     UrlStatus,
 )
 from app.models.taxonomy import TaxonomyCategory, TaxonomyTag
-from app.providers.llm.base import ExtractionRequest
+from app.providers.llm.base import ExtractionRequest, LLMProvider
 from app.providers.llm.mock import MockLLMProvider
-from app.providers.search.base import SearchRequest, SearchResult
+from app.providers.search.base import SearchProvider, SearchRequest, SearchResult
 from app.providers.search.mock import MockSearchProvider
 from app.repositories.sources import (
     find_source_by_canonical_url,
@@ -42,7 +42,11 @@ from app.repositories.sources import (
     has_job_source,
     link_job_source,
 )
-from app.services.evidence import normalize_evidence_text, verify_evidence_quote
+from app.services.evidence import (
+    detect_payment_signal,
+    normalize_evidence_text,
+    verify_evidence_quote,
+)
 from app.services.jobs import add_job_log
 from app.services.scoring_service import recalculate_pain_point
 from app.services.url_safety import validate_outbound_url
@@ -216,7 +220,7 @@ def _persist_source(
 def _extract_candidate(
     *,
     source: SourceItem,
-    llm: MockLLMProvider,
+    llm: LLMProvider,
 ) -> CandidatePayload | None:
     source_text = source.content_text or (
         f"{source.source_title}\n{source.content_excerpt or ''}".strip()
@@ -244,7 +248,14 @@ def _evidence_type(candidate: CandidatePayload) -> EvidenceType:
         return EvidenceType.OTHER
 
 
-def run_research_job(session: Session, job: ResearchJob, settings: Settings) -> ResearchJob:
+def run_research_job(
+    session: Session,
+    job: ResearchJob,
+    settings: Settings,
+    *,
+    search_provider: SearchProvider | None = None,
+    llm_provider: LLMProvider | None = None,
+) -> ResearchJob:
     """Run the Mock-first bounded pipeline and persist every stage outcome."""
 
     if job.status != JobStatus.QUEUED:
@@ -273,8 +284,8 @@ def run_research_job(session: Session, job: ResearchJob, settings: Settings) -> 
     session.commit()
     session.refresh(job)
 
-    search_provider = MockSearchProvider()
-    llm_provider = MockLLMProvider()
+    search_provider = search_provider or MockSearchProvider()
+    llm_provider = llm_provider or MockLLMProvider()
     config = job.config_json
     max_results = int(config.get("max_results_per_query", 3))
     max_total_items = min(int(config.get("max_total_items", 60)), settings.default_job_max_sources)
@@ -381,88 +392,105 @@ def run_research_job(session: Session, job: ResearchJob, settings: Settings) -> 
                 if candidate is None:
                     continue
 
-                verification = verify_evidence_quote(
-                    source.content_text,
-                    candidate.evidence_quote,
-                    content_completeness=source.content_completeness.value,
-                )
-                category_code = str(config.get("primary_categories", ["other"])[0])
-                category = session.scalar(
-                    select(TaxonomyCategory).where(TaxonomyCategory.code == category_code)
-                )
-                known_tags = set(session.scalars(select(TaxonomyTag.code)))
-                tags = [tag for tag in candidate.tags if tag in known_tags][:20]
-                payment_explicit = candidate.payment_signal == "explicit"
-                statement = candidate.pain_statement.strip()
-                existing_statement = session.scalar(
-                    select(PainPoint.id).where(
-                        PainPoint.created_from_job_id == job.id,
-                        PainPoint.canonical_statement == statement,
+                try:
+                    with session.begin_nested():
+                        verification = verify_evidence_quote(
+                            source.content_text,
+                            candidate.evidence_quote,
+                            content_completeness=source.content_completeness.value,
+                        )
+                    category_code = str(config.get("primary_categories", ["other"])[0])
+                    category = session.scalar(
+                        select(TaxonomyCategory).where(TaxonomyCategory.code == category_code)
                     )
-                )
-                if existing_statement is not None:
-                    errors.append(f"duplicate_candidate:{source.id}")
-                    continue
+                    known_tags = set(session.scalars(select(TaxonomyTag.code)))
+                    tags = [tag for tag in candidate.tags if tag in known_tags][:20]
+                    payment_explicit = verification.is_verified and detect_payment_signal(
+                        candidate.evidence_quote
+                    )
+                    statement = candidate.pain_statement.strip()
+                    existing_statement = session.scalar(
+                        select(PainPoint.id).where(
+                            PainPoint.created_from_job_id == job.id,
+                            PainPoint.canonical_statement == statement,
+                        )
+                    )
+                    if existing_statement is not None:
+                        errors.append(f"duplicate_candidate:{source.id}")
+                        continue
 
-                pain_point = PainPoint(
-                    workspace_id=job.workspace_id,
-                    created_from_job_id=job.id,
-                    primary_category_id=category.id if category else None,
-                    canonical_statement=statement,
-                    user_segment=candidate.user_segment or "unknown",
-                    context=candidate.context,
-                    problem_detail=candidate.problem_detail,
-                    current_workaround=candidate.current_workaround,
-                    current_solution_gap="",
-                    pain_type_tags=tags,
-                    status=(
-                        PainPointStatus.NEEDS_REVIEW
-                        if verification.is_verified
-                        else PainPointStatus.HYPOTHESIS
-                    ),
-                    payment_signal_summary="",
-                    root_cause_hypotheses=[],
-                    competitor_summary=[],
-                    validation_next_step=(
-                        "Contact a target user and ask them to walk through the current workflow."
-                    ),
-                )
-                session.add(pain_point)
-                session.flush()
+                    pain_point = PainPoint(
+                        workspace_id=job.workspace_id,
+                        created_from_job_id=job.id,
+                        primary_category_id=category.id if category else None,
+                        canonical_statement=statement,
+                        user_segment=candidate.user_segment or "unknown",
+                        context=candidate.context,
+                        problem_detail=candidate.problem_detail,
+                        current_workaround=candidate.current_workaround,
+                        current_solution_gap="",
+                        pain_type_tags=tags,
+                        status=(
+                            PainPointStatus.NEEDS_REVIEW
+                            if verification.is_verified
+                            else PainPointStatus.HYPOTHESIS
+                        ),
+                        payment_signal_summary="",
+                        root_cause_hypotheses=[],
+                        competitor_summary=[],
+                        validation_next_step=(
+                            "Contact a target user and ask them to walk through the "
+                            "current workflow."
+                        ),
+                    )
+                    session.add(pain_point)
+                    session.flush()
 
-                evidence_status = QuoteMatchStatus(verification.status.value)
-                evidence = PainPointEvidence(
-                    pain_point_id=pain_point.id,
-                    source_item_id=source.id,
-                    evidence_quote=candidate.evidence_quote,
-                    evidence_quote_normalized=verification.normalized_quote,
-                    quote_match_status=evidence_status,
-                    evidence_type=_evidence_type(candidate),
-                    evidence_role=(
-                        EvidenceRole.PAYMENT_SIGNAL if payment_explicit else EvidenceRole.SUPPORTING
-                    ),
-                    evidence_strength_score={
-                        QuoteMatchStatus.EXACT_MATCH: 80.0,
-                        QuoteMatchStatus.NORMALIZED_MATCH: 60.0,
-                        QuoteMatchStatus.SNIPPET_ONLY: 45.0,
-                        QuoteMatchStatus.NOT_FOUND: 20.0,
-                    }[evidence_status],
-                    source_url_snapshot=source.canonical_url,
-                    target_url=source.canonical_url,
-                    related_target_urls=[],
-                    source_published_at_snapshot=source.published_at,
-                    collected_at_snapshot=source.collected_at,
-                    author_independence_key=source.source_author_hash,
-                    manual_verification_status=ManualVerificationStatus.UNREVIEWED,
-                    manual_note="",
-                )
-                pain_point.evidences.append(evidence)
-                session.flush()
-                recalculate_pain_point(session, pain_point)
-                job.extracted_pain_point_count = (job.extracted_pain_point_count or 0) + 1
-                if verification.is_verified:
-                    verified_evidence_count += 1
+                    evidence_status = QuoteMatchStatus(verification.status.value)
+                    evidence = PainPointEvidence(
+                        pain_point_id=pain_point.id,
+                        source_item_id=source.id,
+                        evidence_quote=candidate.evidence_quote,
+                        evidence_quote_normalized=verification.normalized_quote,
+                        quote_match_status=evidence_status,
+                        evidence_type=_evidence_type(candidate),
+                        evidence_role=(
+                            EvidenceRole.PAYMENT_SIGNAL
+                            if payment_explicit
+                            else EvidenceRole.SUPPORTING
+                        ),
+                        evidence_strength_score={
+                            QuoteMatchStatus.EXACT_MATCH: 80.0,
+                            QuoteMatchStatus.NORMALIZED_MATCH: 60.0,
+                            QuoteMatchStatus.SNIPPET_ONLY: 45.0,
+                            QuoteMatchStatus.NOT_FOUND: 20.0,
+                        }[evidence_status],
+                        source_url_snapshot=source.canonical_url,
+                        target_url=source.canonical_url,
+                        related_target_urls=[],
+                        source_published_at_snapshot=source.published_at,
+                        collected_at_snapshot=source.collected_at,
+                        author_independence_key=source.source_author_hash,
+                        manual_verification_status=ManualVerificationStatus.UNREVIEWED,
+                        manual_note="",
+                    )
+                    pain_point.evidences.append(evidence)
+                    session.flush()
+                    recalculate_pain_point(session, pain_point)
+                    job.extracted_pain_point_count = (job.extracted_pain_point_count or 0) + 1
+                    if verification.is_verified:
+                        verified_evidence_count += 1
 
+                except Exception as exc:
+                    errors.append(f"candidate_persist_failed:{source.id}")
+                    add_job_log(
+                        session,
+                        job,
+                        stage="validating_evidence",
+                        level="warning",
+                        message="Candidate was skipped after evidence persistence failed.",
+                        detail={"reason": type(exc).__name__, "source_id": str(source.id)},
+                    )
             job.processed_source_count = job.discovered_source_count
             progress_span = max(1, job.planned_query_count)
             job.progress_percent = min(85, 18 + int(60 * job.processed_query_count / progress_span))

@@ -193,6 +193,7 @@ flowchart LR
     nSEC_018["SEC-018<br/>Fail-closed connected-peer verification"]
     nSEC_019["SEC-019<br/>Production secret strength validation"]
     nSEC_020["SEC-020<br/>Loopback-only local deployment boundary"]
+    nSEC_021["SEC-021<br/>Program-derived payment evidence"]
   end
   subgraph sg_skill["Codex skills"]
     nSKILL_001["SKILL-001<br/>playwright"]
@@ -644,6 +645,9 @@ flowchart LR
   nEVID_026 -->|validated_by| nSEC_013
   nCOMP_007 -->|validated_by| nEVID_026
   nCOMP_003 -->|validated_by| nEVID_026
+  nSEC_021 -->|constrains| nCOMP_012
+  nSEC_021 -->|constrains| nCOMP_016
+  nSEC_021 -->|constrains| nRISK_001
   classDef goal fill:#fff3bf,stroke:#b08900,color:#3d3200
   classDef principle fill:#e7f5ff,stroke:#1971c2,color:#0b2e4f
   classDef requirement fill:#f1f3f5,stroke:#495057,color:#212529
@@ -664,7 +668,7 @@ flowchart LR
   class nTECH_001,nTECH_002,nTECH_003,nTECH_004,nTECH_005,nTECH_006,nTECH_007,nTECH_008,nTECH_009,nTECH_010,nTECH_011,nTECH_012,nTECH_013,nTECH_014,nTECH_015,nTECH_016,nTECH_017,nTECH_018,nTECH_019,nTECH_020,nTECH_021,nTECH_022,nTECH_023,nTECH_024,nTECH_025,nTECH_026,nTECH_027,nTECH_028,nTECH_029,nTECH_030,nTECH_031,nTECH_032,nTECH_033,nTECH_034,nTECH_035,nTECH_036,nTECH_037 technology
   class nCOMP_001,nCOMP_002,nCOMP_003,nCOMP_004,nCOMP_005,nCOMP_006,nCOMP_007,nCOMP_008,nCOMP_009,nCOMP_010,nCOMP_011,nCOMP_012,nCOMP_013,nCOMP_014,nCOMP_015,nCOMP_016,nCOMP_017,nCOMP_018,nCOMP_019,nCOMP_020,nCOMP_021,nCOMP_022,nCOMP_023,nCOMP_024,nCOMP_025,nCOMP_026,nCOMP_027,nCOMP_028,nCOMP_029,nCOMP_030,nCOMP_031,nCOMP_032,nCOMP_033,nCOMP_034,nCOMP_035,nCOMP_036,nCOMP_037,nCOMP_038,nCOMP_039,nCOMP_040,nCOMP_041,nCOMP_042 component
   class nENT_001,nENT_002,nENT_003,nENT_004,nENT_005,nENT_006,nENT_007,nENT_008,nENT_009,nENT_010,nENT_011,nENT_012,nENT_013,nENT_014,nENT_015,nENT_016 data_entity
-  class nSEC_001,nSEC_002,nSEC_003,nSEC_004,nSEC_005,nSEC_006,nSEC_007,nSEC_008,nSEC_009,nSEC_010,nSEC_011,nSEC_012,nSEC_013,nSEC_014,nSEC_015,nSEC_016,nSEC_017,nSEC_018,nSEC_019,nSEC_020 security_control
+  class nSEC_001,nSEC_002,nSEC_003,nSEC_004,nSEC_005,nSEC_006,nSEC_007,nSEC_008,nSEC_009,nSEC_010,nSEC_011,nSEC_012,nSEC_013,nSEC_014,nSEC_015,nSEC_016,nSEC_017,nSEC_018,nSEC_019,nSEC_020,nSEC_021 security_control
   class nSKILL_001,nSKILL_002,nSKILL_003 skill
   class nPHASE_000,nPHASE_001,nPHASE_002,nPHASE_003,nPHASE_004,nPHASE_005 phase
   class nACC_001,nACC_002,nACC_003,nACC_004,nACC_005,nACC_006,nACC_007,nACC_008,nACC_009,nACC_010,nACC_011 acceptance

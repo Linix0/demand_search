@@ -9,6 +9,7 @@ from app.services.scoring import (
     CoverageInput,
     EvidenceConfidenceInput,
     ScoreDimension,
+    ScoreResult,
     calculate_commercial_opportunity,
     calculate_coverage,
     calculate_evidence_confidence,
@@ -116,3 +117,64 @@ def test_weights_must_sum_to_one() -> None:
                 ScoreDimension("two", 0.2, 5, "Second"),
             ),
         )
+
+
+def _mock_evidence_score(_value: object) -> ScoreResult:
+    return ScoreResult(
+        score_type="evidence",
+        total=80.0,
+        version="scores-v1",
+        dimensions=(),
+        caps_applied=(),
+    )
+
+
+def test_payment_role_changes_commercial_score_not_evidence_score(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from types import SimpleNamespace
+
+    import app.services.scoring_service as scoring_service
+    from app.models.pain_point import EvidenceRole, QuoteMatchStatus
+
+    monkeypatch.setattr(scoring_service, "calculate_evidence_confidence", _mock_evidence_score)
+    scores: list[float] = []
+    for role in (EvidenceRole.SUPPORTING, EvidenceRole.PAYMENT_SIGNAL):
+        source = SimpleNamespace(
+            source_url="https://example.com/post",
+            source_title="Manual reporting",
+            content_text="Every week I copy fields.",
+            content_excerpt=None,
+            source_trust_tier="A_primary_user_report",
+            published_at=None,
+            source_domain="example.com",
+            source_author_hash="author-a",
+        )
+        evidence = SimpleNamespace(
+            id="evidence-a",
+            quote_match_status=QuoteMatchStatus.EXACT_MATCH,
+            evidence_role=role,
+            source_item_id="source-a",
+            author_independence_key="author-a",
+            source_item=source,
+            collected_at_snapshot=scoring_service.datetime.now(scoring_service.UTC),
+        )
+        point = SimpleNamespace(
+            id="point-a",
+            evidences=[evidence],
+            user_segment="small_business",
+            evidence_confidence_score=0.0,
+            commercial_opportunity_score=0.0,
+            coverage_score=0.0,
+            score_version="",
+            distinct_source_count=0,
+            distinct_thread_count=0,
+            last_evidence_at=None,
+            payment_signal_summary="",
+        )
+        session = SimpleNamespace(add=lambda _row: None, flush=lambda: None)
+        scoring_service.recalculate_pain_point(session, point)  # type: ignore[arg-type]
+        scores.append(point.commercial_opportunity_score)
+        assert point.evidence_confidence_score == 80.0
+
+    assert scores == [59.0, 71.0]

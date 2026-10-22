@@ -156,6 +156,16 @@ The workbench uses React function components, TanStack Query, React Router, Reac
 
 The Phase 1 lockfile installs React 19.3, TypeScript 5.9, Vite 6.4.5, Vitest 4.1.12, Tailwind 4.3, TanStack Query 5.104, and React Router 7.18. Vitest 4.1.12 preserves Node 20 support while remediating the current mock/pool advisories; `@testing-library/dom` is declared explicitly as the Testing Library peer. Vite 7 is deferred until the Node runtime is upgraded and the full browser/quality suite is rerun.
 
+### ADR-014: Payment evidence is derived from verified quotes
+
+Status: accepted.
+
+The LLM `payment_signal` field is only a hint and is never authoritative. The pipeline assigns `EvidenceRole.PAYMENT_SIGNAL` only when the quote matches stored source text (`exact_match` or `normalized_match`) and a deterministic, bounded rule detects an affirmative budget, purchase, or payment statement. Negated and hypothetical statements are rejected. `snippet_only` quotes cannot establish payment evidence. Commercial scoring consumes only the persisted final evidence role.
+
+The initial rule set covers narrow English and Chinese phrases such as "budget approved", "purchase order", "paid for", 预算已批准, 已购买, and 已付款. Broad terms such as "budget" or "pay" alone are not sufficient. Expand rules only with regression fixtures.
+
+The research pipeline also accepts injected `SearchProvider` and `LLMProvider` implementations for integration tests while keeping Mock providers as the runtime default. Candidate persistence runs in a per-source savepoint so a constraint or data failure skips only that source and leaves the job `completed_with_errors`.
+
 ## Proposed dependency sets
 
 ### Backend runtime
