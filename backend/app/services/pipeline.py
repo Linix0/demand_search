@@ -36,7 +36,12 @@ from app.providers.llm.base import ExtractionRequest
 from app.providers.llm.mock import MockLLMProvider
 from app.providers.search.base import SearchRequest, SearchResult
 from app.providers.search.mock import MockSearchProvider
-from app.repositories.sources import find_source_by_canonical_url, find_source_by_external_id
+from app.repositories.sources import (
+    find_source_by_canonical_url,
+    find_source_by_external_id,
+    has_job_source,
+    link_job_source,
+)
 from app.services.evidence import normalize_evidence_text, verify_evidence_quote
 from app.services.jobs import add_job_log
 from app.services.scoring_service import recalculate_pain_point
@@ -113,8 +118,11 @@ def _persist_source(
     settings: Settings,
     max_total_items: int,
 ) -> tuple[SourceItem | None, bool]:
-    if job.discovered_source_count >= max_total_items:
-        return None, False
+    # Column defaults are applied at INSERT time; ORM attributes can still be None on
+    # objects created earlier in the same session until they are refreshed.
+    job.discovered_source_count = job.discovered_source_count or 0
+    job.processed_source_count = job.processed_source_count or 0
+
     try:
         canonical_url = validate_outbound_url(
             result.url,
@@ -136,7 +144,23 @@ def _persist_source(
     if existing is None:
         existing = find_source_by_canonical_url(session, canonical_url)
     if existing is not None:
-        return None, True
+        if has_job_source(session, job.id, existing.id):
+            add_job_log(
+                session,
+                job,
+                stage="searching",
+                message="Skipped a source already linked to this job.",
+                detail={"source_id": str(existing.id)},
+            )
+            return None, True
+        if job.discovered_source_count >= max_total_items:
+            return None, False
+        link_job_source(session, job.id, existing.id)
+        job.discovered_source_count = (job.discovered_source_count or 0) + 1
+        return existing, False
+
+    if job.discovered_source_count >= max_total_items:
+        return None, False
 
     completeness = _completeness(result)
     tier = _trust_tier(result, completeness)
@@ -184,7 +208,8 @@ def _persist_source(
     )
     session.add(source)
     session.flush()
-    job.discovered_source_count += 1
+    link_job_source(session, job.id, source.id)
+    job.discovered_source_count = (job.discovered_source_count or 0) + 1
     return source, False
 
 
@@ -234,6 +259,13 @@ def run_research_job(session: Session, job: ResearchJob, settings: Settings) -> 
     max_total_items = min(int(config.get("max_total_items", 60)), settings.default_job_max_sources)
     errors: list[str] = []
     verified_evidence_count = 0
+
+    job.planned_query_count = job.planned_query_count or 0
+    job.processed_query_count = job.processed_query_count or 0
+    job.discovered_source_count = job.discovered_source_count or 0
+    job.processed_source_count = job.processed_source_count or 0
+    job.extracted_pain_point_count = job.extracted_pain_point_count or 0
+    job.verified_evidence_count = job.verified_evidence_count or 0
 
     job.status = JobStatus.RUNNING
     job.stage = JobStage.QUERY_PLANNING
@@ -306,7 +338,7 @@ def run_research_job(session: Session, job: ResearchJob, settings: Settings) -> 
             query_row.result_count = len(results)
             query_row.status = QueryStatus.COMPLETED
             query_row.executed_at = datetime.now(UTC)
-            job.processed_query_count += 1
+            job.processed_query_count = (job.processed_query_count or 0) + 1
             for result in results:
                 source, was_duplicate = _persist_source(
                     session,
@@ -412,7 +444,7 @@ def run_research_job(session: Session, job: ResearchJob, settings: Settings) -> 
                 pain_point.evidences.append(evidence)
                 session.flush()
                 recalculate_pain_point(session, pain_point)
-                job.extracted_pain_point_count += 1
+                job.extracted_pain_point_count = (job.extracted_pain_point_count or 0) + 1
                 if verification.is_verified:
                     verified_evidence_count += 1
 

@@ -15,6 +15,7 @@ from app.models.pain_point import (
 from app.models.provider import ProviderHealth, SourceProvider
 from app.models.research import AuditLog, QueryStatus, ResearchJobLog, SearchQuery
 from app.models.research_job import JobStage, JobStatus, ResearchJob
+from app.models.research_job_source import ResearchJobSource
 from app.models.source import (
     ContentCompleteness,
     RetrievalMethod,
@@ -43,6 +44,7 @@ __all__ = [
     "QuoteMatchStatus",
     "ResearchJob",
     "ResearchJobLog",
+    "ResearchJobSource",
     "RetrievalMethod",
     "ScoreType",
     "SearchQuery",

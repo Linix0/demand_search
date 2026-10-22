@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import ColumnElement, func, or_, select
 from sqlalchemy.orm import Session
 
+from app.models.research_job_source import ResearchJobSource
 from app.models.source import ContentCompleteness, SourceItem
 
 
@@ -40,9 +41,15 @@ def list_sources(
     completeness: ContentCompleteness | None = None,
     query: str | None = None,
 ) -> tuple[list[SourceItem], int]:
-    conditions = []
+    conditions: list[ColumnElement[bool]] = []
     if job_id is not None:
-        conditions.append(SourceItem.research_job_id == job_id)
+        conditions.append(
+            SourceItem.id.in_(
+                select(ResearchJobSource.source_item_id).where(
+                    ResearchJobSource.research_job_id == job_id
+                )
+            )
+        )
     if provider_code:
         conditions.append(SourceItem.provider_code == provider_code)
     if source_domain:
@@ -64,3 +71,21 @@ def list_sources(
         .limit(page_size)
     )
     return list(session.scalars(statement)), total
+
+
+def has_job_source(session: Session, job_id: uuid.UUID, source_id: uuid.UUID) -> bool:
+    statement = select(ResearchJobSource.id).where(
+        ResearchJobSource.research_job_id == job_id,
+        ResearchJobSource.source_item_id == source_id,
+    )
+    return session.scalar(statement) is not None
+
+
+def link_job_source(session: Session, job_id: uuid.UUID, source_id: uuid.UUID) -> bool:
+    """Link a source to a job once; return True when the link is new."""
+
+    if has_job_source(session, job_id, source_id):
+        return False
+    session.add(ResearchJobSource(research_job_id=job_id, source_item_id=source_id))
+    session.flush()
+    return True

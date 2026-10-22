@@ -81,6 +81,27 @@ def test_demo_produces_traceable_candidates_and_exports(client: TestClient) -> N
     assert "not market facts" in markdown_response.text
 
 
+def test_demo_reuses_shared_sources_without_losing_job_outputs(client: TestClient) -> None:
+    first = _run_demo(client)["job"]
+    second = _run_demo(client)["job"]
+
+    for job in (first, second):
+        assert job["status"] == "completed"
+        assert job["discovered_source_count"] == 30
+        assert job["extracted_pain_point_count"] >= 30
+
+    for job in (first, second):
+        sources = client.get(
+            "/api/v1/source-items", params={"job_id": job["id"], "page_size": 100}
+        ).json()
+        pain_points = client.get(
+            "/api/v1/pain-points", params={"job_id": job["id"], "page_size": 100}
+        ).json()
+        assert sources["total"] == 30
+        assert pain_points["total"] >= 30
+        assert all(item["created_from_job_id"] == job["id"] for item in pain_points["items"])
+
+
 def test_verification_requires_verified_quote(client: TestClient) -> None:
     _run_demo(client)
     listing = client.get("/api/v1/pain-points", params={"page_size": 100}).json()

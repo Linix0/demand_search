@@ -50,6 +50,12 @@ def create_job(session: Session, payload: JobCreateRequest) -> ResearchJob:
         date_to=payload.date_to,
         cost_limit=payload.config.max_job_cost,
         estimated_cost="0",
+        planned_query_count=0,
+        processed_query_count=0,
+        discovered_source_count=0,
+        processed_source_count=0,
+        extracted_pain_point_count=0,
+        verified_evidence_count=0,
         progress_percent=0,
     )
     session.add(job)
